@@ -1,0 +1,441 @@
+{
+  "metadata": {
+    "name": "nutrition_reanimation_rules",
+    "version": "0.2.0",
+    "language": "fr",
+    "source_document": "script aide nutritionnelle(1).docx",
+    "status": "draft_rules_updated_with_user_clarifications",
+    "last_update": "2026-07-19"
+  },
+  "inputs": {
+    "anthropometry": {
+      "height_m": {
+        "type": "number",
+        "required": true,
+        "unit": "m"
+      },
+      "actual_weight_kg": {
+        "type": "number",
+        "required": true,
+        "unit": "kg"
+      }
+    },
+    "clinical_state": {
+      "phase": {
+        "type": "enum",
+        "required": true,
+        "allowed_values": [
+          "aigue_defaillance",
+          "stabilisation",
+          "rehabilitation"
+        ],
+        "selection_mode": "manual_physician_choice",
+        "note": "La phase est choisie par le médecin. Elle n'est pas automatiquement monotone : un patient peut régresser vers une phase de défaillance en cas de nouvel état de choc."
+      },
+      "multiorgan_shock": {
+        "type": "boolean",
+        "required": true
+      },
+      "major_instability": {
+        "type": "boolean",
+        "required": false
+      },
+      "high_or_increasing_catecholamines": {
+        "type": "boolean",
+        "required": false
+      },
+      "hypoperfusion": {
+        "type": "boolean",
+        "required": false
+      },
+      "hyperlactatemia": {
+        "type": "boolean",
+        "required": false
+      }
+    },
+    "nutrition_route": {
+      "enteral_contraindication": {
+        "type": "boolean",
+        "required": true
+      },
+      "enteral_possible": {
+        "type": "boolean",
+        "required": true
+      }
+    },
+    "renal_replacement_therapy": {
+      "rrt": {
+        "type": "boolean",
+        "required": true,
+        "label": "Épuration extrarénale en cours"
+      },
+      "citrate_anticoagulation": {
+        "type": "boolean",
+        "required_if": "rrt == true",
+        "label": "Anticoagulation citrate"
+      },
+      "renal_failure_without_rrt": {
+        "type": "boolean",
+        "required": true,
+        "label": "Insuffisance rénale non épurée"
+      }
+    },
+    "non_nutritional_calories": {
+      "propofol": {
+        "enabled": {
+          "type": "boolean",
+          "required": false
+        },
+        "dose_mg_per_h": {
+          "type": "number",
+          "required_if_enabled": true,
+          "unit": "mg/h"
+        },
+        "concentration_mg_per_ml": {
+          "type": "number",
+          "required_if_enabled": true,
+          "unit": "mg/mL"
+        },
+        "kcal_per_ml": 1.1
+      },
+      "glucose": {
+        "enabled": {
+          "type": "boolean",
+          "required": false
+        },
+        "daily_volume_ml": {
+          "type": "number",
+          "required_if_enabled": true,
+          "unit": "mL/j"
+        },
+        "solution": {
+          "type": "enum",
+          "allowed_values": [
+            "G2.5",
+            "G5",
+            "G10",
+            "G30"
+          ],
+          "required_if_enabled": true
+        },
+        "kcal_per_g": 4
+      },
+      "citrate": {
+        "enabled": {
+          "type": "boolean",
+          "required": false
+        },
+        "flow_ml_per_min": {
+          "type": "number",
+          "required_if_enabled": true,
+          "unit": "mL/min"
+        },
+        "solution": {
+          "type": "enum",
+          "allowed_values": [
+            "Regiocit"
+          ],
+          "required_if_enabled": true
+        },
+        "citrate_concentration_g_per_ml": {
+          "type": "number",
+          "required_if_enabled": true,
+          "status": "to_validate_locally"
+        },
+        "kcal_per_g": 3
+      }
+    }
+  },
+  "derived_variables": {
+    "bmi": "actual_weight_kg / height_m^2",
+    "ideal_weight_kg": "25 * height_m^2",
+    "adjusted_weight_kg": "ideal_weight_kg + 0.25 * (actual_weight_kg - ideal_weight_kg)",
+    "calculation_weight_kg": "actual_weight_kg if bmi <= 30 else adjusted_weight_kg"
+  },
+  "energy_targets": {
+    "aigue_defaillance": {
+      "kcal_per_kg_min": 5,
+      "kcal_per_kg_max": 10
+    },
+    "stabilisation": {
+      "kcal_per_kg_min": 10,
+      "kcal_per_kg_max": 20
+    },
+    "rehabilitation": {
+      "kcal_per_kg_min": 20,
+      "kcal_per_kg_max": 25,
+      "note": "Cible validée : 20-25 kcal/kg/j. La mention 25-30 était une erreur."
+    }
+  },
+  "protein_targets_by_phase": {
+    "aigue_defaillance": {
+      "g_per_kg_min": 0.2,
+      "g_per_kg_max": 0.4
+    },
+    "stabilisation": {
+      "g_per_kg_min": 0.7,
+      "g_per_kg_max": 0.9
+    },
+    "rehabilitation": {
+      "g_per_kg_min": 1.2,
+      "g_per_kg_max": 1.5,
+      "special_cases": [
+        {
+          "condition": "rrt == true",
+          "target_g_per_kg": 1.5,
+          "label": "Patient sous épuration extrarénale en phase de réhabilitation"
+        },
+        {
+          "condition": "renal_failure_without_rrt == true and rrt == false",
+          "target_g_per_kg": 0.9,
+          "label": "Insuffisance rénale non épurée en phase de réhabilitation"
+        }
+      ]
+    }
+  },
+  "protein_max_by_energy_target": [
+    {
+      "kcal_per_kg_upper": 10,
+      "protein_max_g_per_kg": 0.4
+    },
+    {
+      "kcal_per_kg_lower": 10,
+      "kcal_per_kg_upper": 15,
+      "protein_max_g_per_kg": 0.7
+    },
+    {
+      "kcal_per_kg_lower": 15,
+      "kcal_per_kg_upper": 20,
+      "protein_max_g_per_kg": 0.9
+    },
+    {
+      "kcal_per_kg_lower": 20,
+      "kcal_per_kg_upper": 25,
+      "protein_max_g_per_kg": 1.2
+    },
+    {
+      "kcal_per_kg_lower": 25,
+      "protein_max_g_per_kg": 1.5
+    }
+  ],
+  "non_nutritional_calorie_formulas": {
+    "propofol_kcal_per_day": "(dose_mg_per_h * 24 / concentration_mg_per_ml) * 1.1",
+    "glucose_kcal_per_day": "(daily_volume_ml * glucose_g_per_100ml / 100) * 4",
+    "citrate_kcal_per_day": "flow_ml_per_min * 1440 * citrate_concentration_g_per_ml * 3",
+    "total_non_nutritional_kcal_per_day": "propofol_kcal_per_day + glucose_kcal_per_day + citrate_kcal_per_day"
+  },
+  "glucose_solutions": {
+    "G2.5": {
+      "glucose_g_per_100ml": 2.5
+    },
+    "G5": {
+      "glucose_g_per_100ml": 5
+    },
+    "G10": {
+      "glucose_g_per_100ml": 10
+    },
+    "G30": {
+      "glucose_g_per_100ml": 30
+    }
+  },
+  "decision_rules": [
+    {
+      "id": "PHASE_001",
+      "label": "Choix manuel de la phase",
+      "if": "patient_evaluated_by_physician",
+      "then": {
+        "phase_selection": "manual",
+        "allowed_regression": true,
+        "message": "La phase nutritionnelle est choisie par le médecin et peut régresser en cas de nouvelle défaillance ou de nouvel état de choc."
+      }
+    },
+    {
+      "id": "STOP_001",
+      "label": "Pas de nutrition si choc multiviscéral ou instabilité majeure",
+      "if": "multiorgan_shock == true or major_instability == true or high_or_increasing_catecholamines == true or hypoperfusion == true or hyperlactatemia == true",
+      "then": {
+        "nutrition_status": "no_nutrition",
+        "message": "Pas de nutrition ; réévaluation clinique ultérieure."
+      }
+    },
+    {
+      "id": "START_001",
+      "label": "Support nutritionnel dans les 48 h si absence d'état de choc majeur",
+      "if": "STOP_001 is false",
+      "then": {
+        "nutrition_status": "nutrition_possible",
+        "timing": "dans_les_48h"
+      }
+    },
+    {
+      "id": "ROUTE_001",
+      "label": "Nutrition parentérale si contre-indication à la nutrition entérale",
+      "if": "enteral_contraindication == true",
+      "then": {
+        "preferred_route": "parenterale",
+        "contraindications_reference": "enteral_nutrition_contraindications"
+      }
+    },
+    {
+      "id": "ROUTE_002",
+      "label": "Nutrition entérale en première intention si possible",
+      "if": "enteral_contraindication == false and enteral_possible == true",
+      "then": {
+        "preferred_route": "enterale"
+      }
+    },
+    {
+      "id": "ROUTE_003",
+      "label": "NE et/ou NP en stabilisation selon tolérance et progression",
+      "if": "phase == 'stabilisation'",
+      "then": {
+        "allowed_routes": [
+          "enterale",
+          "parenterale",
+          "mixte"
+        ]
+      }
+    },
+    {
+      "id": "PROTEIN_REHAB_RRT_001",
+      "label": "Objectif protéique de réhabilitation sous EER",
+      "if": "phase == 'rehabilitation' and rrt == true",
+      "then": {
+        "protein_target_g_per_kg": 1.5
+      }
+    },
+    {
+      "id": "PROTEIN_REHAB_RENAL_NO_RRT_001",
+      "label": "Objectif protéique en insuffisance rénale non épurée",
+      "if": "phase == 'rehabilitation' and renal_failure_without_rrt == true and rrt == false",
+      "then": {
+        "protein_target_g_per_kg": 0.9
+      }
+    },
+    {
+      "id": "ENERGY_LIMIT_001",
+      "label": "Ne pas dépasser la cible calorique",
+      "if": "candidate_energy_kcal_day > nutritional_energy_max_kcal_day",
+      "then": {
+        "candidate_status": "rejected",
+        "message": "Prescription rejetée : dépassement de la cible calorique maximale."
+      }
+    }
+  ],
+  "prescription_calculation": {
+    "energy_target_min_kcal_day": "calculation_weight_kg * phase.kcal_per_kg_min",
+    "energy_target_max_kcal_day": "calculation_weight_kg * phase.kcal_per_kg_max",
+    "non_nutritional_kcal_day": "propofol_kcal_per_day + glucose_kcal_per_day + citrate_kcal_per_day",
+    "nutritional_energy_min_kcal_day": "max(0, energy_target_min_kcal_day - non_nutritional_kcal_day)",
+    "nutritional_energy_max_kcal_day": "max(0, energy_target_max_kcal_day - non_nutritional_kcal_day)",
+    "protein_target_g_per_kg": "if phase == 'rehabilitation' and rrt == true: 1.5; else if phase == 'rehabilitation' and renal_failure_without_rrt == true and rrt == false: 0.9; else use phase protein target range",
+    "protein_target_min_g_day": "calculation_weight_kg * phase.g_per_kg_min",
+    "protein_target_max_g_day": "calculation_weight_kg * phase.g_per_kg_max",
+    "protein_target_selected_g_day": "calculation_weight_kg * protein_target_g_per_kg",
+    "protein_deficit_g_day": "max(0, protein_target_selected_g_day - prescribed_protein_g_day)",
+    "calorie_excess_policy": "strict_no_exceedance_of_nutritional_energy_max_kcal_day"
+  },
+  "optimizer": {
+    "priority_order": [
+      "reject_any_candidate_exceeding_calorie_target_max",
+      "respect_energy_target_range",
+      "minimize_distance_to_selected_energy_target_without_exceeding",
+      "prioritize_calories_over_proteins",
+      "display_protein_deficit",
+      "minimize_volume_if_equal_energy_fit",
+      "prefer_simpler_prescription"
+    ],
+    "hard_constraints": [
+      "candidate_energy_kcal_day <= nutritional_energy_max_kcal_day",
+      "total_energy_including_non_nutritional_kcal_day <= energy_target_max_kcal_day"
+    ],
+    "candidate_output_fields": [
+      "route",
+      "solute_name",
+      "bag_or_unit_count",
+      "total_volume_ml_day",
+      "flow_ml_h",
+      "energy_kcal_day",
+      "protein_g_day",
+      "energy_gap_kcal_day",
+      "protein_deficit_g_day",
+      "rejected_if_calorie_excess"
+    ],
+    "allowed_quantities_per_day": [
+      0.25,
+      0.5,
+      0.75,
+      1,
+      1.25,
+      1.5,
+      1.75,
+      2,
+      2.25,
+      2.5,
+      2.75,
+      3,
+      3.25,
+      3.5,
+      3.75,
+      4
+    ]
+  },
+  "monitoring_checklists": {
+    "stabilisation": {
+      "digestive": [
+        "vomissements",
+        "regurgitation",
+        "diarrhee",
+        "distension_abdominale",
+        "pression_intra_abdominale"
+      ],
+      "metabolic": [
+        "phosphate",
+        "magnesium",
+        "potassium",
+        "glycemie",
+        "insuline",
+        "triglycerides",
+        "bilan_hepatique",
+        "uree"
+      ]
+    },
+    "rehabilitation": [
+      "evaluation_denutrition",
+      "evaluation_fonction_musculaire",
+      "mobilisation",
+      "exercice_physique",
+      "prise_en_charge_psychologique",
+      "depistage_dysphagie_post_extubation",
+      "suivi_dietetique_post_reanimation"
+    ]
+  },
+  "validation_needed": [
+    "Définir la concentration locale utilisée pour le citrate/Regiocit.",
+    "Définir les concentrations de propofol disponibles ou demander directement le débit en mL/h.",
+    "Définir la cible par défaut dans une fourchette : borne basse, médiane ou borne haute.",
+    "Définir la conduite à tenir si aucune prescription disponible n'atteint la cible sans dépassement : proposer sous-cible ou fractionnement."
+  ],
+  "enteral_nutrition_contraindications": [
+    {
+      "id": "CI_NE_001",
+      "label": "Hémorragie digestive haute non contrôlée"
+    },
+    {
+      "id": "CI_NE_002",
+      "label": "Ischémie intestinale suspectée ou avérée"
+    },
+    {
+      "id": "CI_NE_003",
+      "label": "Occlusion intestinale"
+    },
+    {
+      "id": "CI_NE_004",
+      "label": "Syndrome du compartiment abdominal"
+    },
+    {
+      "id": "CI_NE_005",
+      "label": "Fistule digestive à haut débit en l’absence d’accès distal"
+    }
+  ]
+}
