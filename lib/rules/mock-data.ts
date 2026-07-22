@@ -36,7 +36,7 @@ export const demoRules: NutritionRules = {
     citrateKcalPerMmol: 0.59,
   },
   glucoseSolutionsGPer100Ml: {
-    G2.5: 2.5,
+    "G2.5": 2.5,
     G5: 5,
     G10: 10,
     G30: 30,
