@@ -3,9 +3,14 @@
     "name": "nutrition_reanimation_rules",
     "version": "0.2.0",
     "language": "fr",
-    "source_document": "script aide nutritionnelle(1).docx",
-    "status": "draft_rules_updated_with_user_clarifications",
-    "last_update": "2026-07-19"
+    "source_document": "RFE Nutrition SFAR-SFNCM 2026 et règles locales validées",
+    "status": "updated_with_2026_rfe",
+    "last_update": "2026-10-02"
+  },
+  "clinical_phase_definitions": {
+    "aigue_defaillance": "L’état de choc ou de défaillance multiviscérale correspond à la situation la plus sévère, caractérisée par une agression sévère et une instabilité hémodynamique nécessitant potentiellement le recours à des catécholamines, à une ventilation mécanique et/ou à une sédation profonde. Cet état recouvre la phase aiguë précoce décrite par l’ESPEN.",
+    "stabilisation": "L’état de stabilisation concerne les patients en amélioration clinique, marquée par la résolution progressive des défaillances, la conduite du sevrage ventilatoire, l’allègement des sédations et des doses faibles et stables de catécholamines ou récemment sevrées. Cet état correspond globalement à la phase aiguë tardive.",
+    "rehabilitation": "L’état de réhabilitation désigne les patients cliniquement stabilisés, peu défaillants, capables de mobilisation, d’exercice physique et parfois de reprise de la nutrition orale."
   },
   "inputs": {
     "anthropometry": {
@@ -125,24 +130,47 @@
           "type": "boolean",
           "required": false
         },
-        "flow_ml_per_min": {
+        "blood_flow_ml_per_min": {
           "type": "number",
           "required_if_enabled": true,
-          "unit": "mL/min"
+          "unit": "mL/min",
+          "label": "Débit sanguin moyen dans le circuit d’épuration"
         },
-        "solution": {
-          "type": "enum",
-          "allowed_values": [
-            "Regiocit"
-          ],
-          "required_if_enabled": true
-        },
-        "citrate_concentration_g_per_ml": {
+        "dose_mmol_per_l_blood": {
           "type": "number",
           "required_if_enabled": true,
-          "status": "to_validate_locally"
+          "unit": "mmol/L de sang traité",
+          "default": 3.3
         },
-        "kcal_per_g": 3
+        "elimination_fraction": {
+          "type": "number",
+          "unit": "fraction",
+          "default": 0.5,
+          "source_note": "Fraction éliminée dans l’effluent estimée autour de 50 % dans les RFE 2026."
+        },
+        "kcal_per_mmol_metabolized": 0.59,
+        "blood_flow_conversion_l_day_per_ml_min": 1.44,
+        "default_dose_mmol_l_blood": 3.3,
+        "default_elimination_fraction": 0.5,
+        "default_blood_flow_ml_min_by_weight": [
+          {
+            "min_weight_kg": null,
+            "max_weight_kg": 70,
+            "max_inclusive": false,
+            "flow_ml_min": 110
+          },
+          {
+            "min_weight_kg": 70,
+            "max_weight_kg": 90,
+            "max_inclusive": true,
+            "flow_ml_min": 120
+          },
+          {
+            "min_weight_kg": 90,
+            "max_weight_kg": null,
+            "flow_ml_min": 130
+          }
+        ]
       }
     }
   },
@@ -154,14 +182,17 @@
   },
   "energy_targets": {
     "aigue_defaillance": {
+      "label": "État de choc / défaillance multiviscérale",
       "kcal_per_kg_min": 5,
       "kcal_per_kg_max": 10
     },
     "stabilisation": {
+      "label": "Stabilisation",
       "kcal_per_kg_min": 10,
       "kcal_per_kg_max": 20
     },
     "rehabilitation": {
+      "label": "Réhabilitation",
       "kcal_per_kg_min": 20,
       "kcal_per_kg_max": 25,
       "note": "Cible validée : 20-25 kcal/kg/j. La mention 25-30 était une erreur."
@@ -221,7 +252,7 @@
   "non_nutritional_calorie_formulas": {
     "propofol_kcal_per_day": "(dose_mg_per_h * 24 / concentration_mg_per_ml) * 1.1",
     "glucose_kcal_per_day": "(daily_volume_ml * glucose_g_per_100ml / 100) * 4",
-    "citrate_kcal_per_day": "flow_ml_per_min * 1440 * citrate_concentration_g_per_ml * 3",
+    "citrate_kcal_per_day": "blood_flow_ml_per_min * dose_mmol_per_l_blood * 1.44 * (1 - elimination_fraction) * 0.59",
     "total_non_nutritional_kcal_per_day": "propofol_kcal_per_day + glucose_kcal_per_day + citrate_kcal_per_day"
   },
   "glucose_solutions": {
@@ -335,6 +366,51 @@
     "protein_deficit_g_day": "max(0, protein_target_selected_g_day - prescribed_protein_g_day)",
     "calorie_excess_policy": "strict_no_exceedance_of_nutritional_energy_max_kcal_day"
   },
+  "nutrition_progression": {
+    "not_already_receiving_enteral": {
+      "source": "RFE 2026 : augmentation progressive des apports selon la tolérance ; calendrier opérationnel validé localement.",
+      "steps": [
+        {
+          "day": "J1",
+          "range_position": 0.0
+        },
+        {
+          "day": "J2",
+          "range_position": 0.5
+        },
+        {
+          "day": "J3",
+          "range_position": 1.0
+        }
+      ]
+    },
+    "already_receiving_enteral": {
+      "source": "Règle clinique locale : patient déjà alimenté par voie entérale.",
+      "steps": [
+        {
+          "day": "J1",
+          "range_position": 0.5
+        },
+        {
+          "day": "J2",
+          "range_position": 1.0
+        }
+      ]
+    }
+  },
+  "enteral_administration": {
+    "default_mode": "continuous_rate",
+    "modes": [
+      "continuous_rate",
+      "period_volumes"
+    ],
+    "period_volumes": {
+      "standard_period_hours": 12,
+      "daily_hours": 24,
+      "max_bags_with_standard_period": 2,
+      "note": "Jusqu’à deux poches : volumes répartis sur des périodes de 12 h. À partir de trois poches : répartition régulière sur 24 h, soit 8 h par poche pour trois poches. Le dernier volume est adapté si la poche est incomplète."
+    }
+  },
   "optimizer": {
     "priority_order": [
       "reject_any_candidate_exceeding_calorie_target_max",
@@ -349,6 +425,7 @@
       "candidate_energy_kcal_day <= nutritional_energy_max_kcal_day",
       "total_energy_including_non_nutritional_kcal_day <= energy_target_max_kcal_day"
     ],
+    "max_results": 5,
     "candidate_output_fields": [
       "route",
       "solute_name",
@@ -411,7 +488,6 @@
     ]
   },
   "validation_needed": [
-    "Définir la concentration locale utilisée pour le citrate/Regiocit.",
     "Définir les concentrations de propofol disponibles ou demander directement le débit en mL/h.",
     "Définir la cible par défaut dans une fourchette : borne basse, médiane ou borne haute.",
     "Définir la conduite à tenir si aucune prescription disponible n'atteint la cible sans dépassement : proposer sous-cible ou fractionnement."

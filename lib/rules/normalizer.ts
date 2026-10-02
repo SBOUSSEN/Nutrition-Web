@@ -33,7 +33,7 @@ export function normalizeRules(input: any): NutritionRules {
     metadata: input.metadata ?? {},
     phaseTargets: {
       aigue_defaillance: {
-        label: "phase aiguë / défaillance",
+        label: energyTargets.aigue_defaillance.label,
         kcalPerKg: [
           energyTargets.aigue_defaillance.kcal_per_kg_min,
           energyTargets.aigue_defaillance.kcal_per_kg_max,
@@ -46,7 +46,7 @@ export function normalizeRules(input: any): NutritionRules {
           proteinTargets.aigue_defaillance.g_per_kg_max,
       },
       stabilisation: {
-        label: "stabilisation",
+        label: energyTargets.stabilisation.label,
         kcalPerKg: [
           energyTargets.stabilisation.kcal_per_kg_min,
           energyTargets.stabilisation.kcal_per_kg_max,
@@ -58,7 +58,7 @@ export function normalizeRules(input: any): NutritionRules {
         defaultProteinGPerKg: proteinTargets.stabilisation.g_per_kg_max,
       },
       rehabilitation: {
-        label: "réhabilitation",
+        label: energyTargets.rehabilitation.label,
         kcalPerKg: [
           energyTargets.rehabilitation.kcal_per_kg_min,
           energyTargets.rehabilitation.kcal_per_kg_max,
@@ -77,8 +77,9 @@ export function normalizeRules(input: any): NutritionRules {
     nonNutritionalConstants: {
       propofolKcalPerMl: propofol.kcal_per_ml,
       glucoseKcalPerG: glucose.kcal_per_g,
-      citrateKcalPerG: citrate.kcal_per_g,
-      citrateKcalPerMmol: 0.59,
+      citrateKcalPerMmol: citrate.kcal_per_mmol_metabolized,
+      citrateBloodFlowConversionLDay:
+        citrate.blood_flow_conversion_l_day_per_ml_min,
     },
     glucoseSolutionsGPer100Ml: Object.fromEntries(
       Object.entries(input.glucose_solutions).map(([name, value]: [string, any]) => [
@@ -110,7 +111,41 @@ export function normalizeRules(input: any): NutritionRules {
     },
     defaults: {
       citrateSolutionName: "Regiocit",
-      citrateConcentrationGMl: 0,
+      citrateDoseMmolLBlood: citrate.default_dose_mmol_l_blood,
+      citrateEliminationFraction: citrate.default_elimination_fraction,
+    },
+    clinicalPhaseDefinitions: input.clinical_phase_definitions,
+    nutritionProgression: {
+      notAlreadyReceivingEnteral: {
+        source: input.nutrition_progression.not_already_receiving_enteral.source,
+        steps: input.nutrition_progression.not_already_receiving_enteral.steps.map(
+          (step: { day: "J1" | "J2" | "J3"; range_position: number }) => ({
+            day: step.day.replace("J", "Jour ") as "Jour 1" | "Jour 2" | "Jour 3",
+            rangePosition: step.range_position,
+          }),
+        ),
+      },
+      alreadyReceivingEnteral: {
+        source: input.nutrition_progression.already_receiving_enteral.source,
+        steps: input.nutrition_progression.already_receiving_enteral.steps.map(
+          (step: { day: "J1" | "J2" | "J3"; range_position: number }) => ({
+            day: step.day.replace("J", "Jour ") as "Jour 1" | "Jour 2" | "Jour 3",
+            rangePosition: step.range_position,
+          }),
+        ),
+      },
+    },
+    enteralAdministration: {
+      defaultMode: input.enteral_administration.default_mode,
+      modes: input.enteral_administration.modes,
+      periodVolumes: {
+        standardPeriodHours:
+          input.enteral_administration.period_volumes.standard_period_hours,
+        dailyHours: input.enteral_administration.period_volumes.daily_hours,
+        maxBagsWithStandardPeriod:
+          input.enteral_administration.period_volumes.max_bags_with_standard_period,
+        note: input.enteral_administration.period_volumes.note,
+      },
     },
     validationNeeded: input.validation_needed ?? [],
   };

@@ -8,7 +8,6 @@ export default async function HomePage() {
     <NutritionWorkspace
       initialRules={dataset.rules}
       initialSolutes={dataset.solutes}
-      sourcePaths={dataset.sources}
     />
   );
 }

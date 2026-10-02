@@ -1,17 +1,23 @@
-voie,solute,kcal,proteines_g,volume_ml
-Parenterale,Somofkabiven,550,25,493
-Parenterale,Somofkabiven,1100,50,986
-Parenterale,Somofkabiven,1300,75,1477
-Parenterale,Somofkabiven,1800,100,1970
-Parenterale,Somofkabiven,2200,125,2463
-Parenterale,Smofprot,900,66,1012
-Parenterale,Olimel N7,1140,44,1000
-Parenterale,Olimel N7,1710,66,1500
-Parenterale,Olimel N7,2270,88,2000
-Parenterale,Olimel N9,1070,56,1000
-Parenterale,Olimel N9,1600,85,1500
-Parenterale,Olimel N9,2140,113,2000
-Parenterale,Olimel N12,620,49,650
-Enterale,Original,500,12,500
-Enterale,Megareal,700,34,500
-Enterale,2kcal,1000,50,500
+voie,solute,kcal,proteines_g,volume_ml,lipides_g,glucides_g,fibres_g,eau_ml,osmolarite_mosm_l,tcm_g,reference,code_lppr,specificites
+Parenterale,Somofkabiven,550,25,493,,,,,,,,,
+Parenterale,Somofkabiven,1100,50,986,,,,,,,,,
+Parenterale,Somofkabiven,1300,75,1477,,,,,,,,,
+Parenterale,Somofkabiven,1800,100,1970,,,,,,,,,
+Parenterale,Somofkabiven,2200,125,2463,,,,,,,,,
+Parenterale,Smofprot,900,66,1012,,,,,,,,,
+Parenterale,Olimel N7,1140,44,1000,,,,,,,,,
+Parenterale,Olimel N7,1710,66,1500,,,,,,,,,
+Parenterale,Olimel N7,2270,88,2000,,,,,,,,,
+Parenterale,Olimel N9,1070,56,1000,,,,,,,,,
+Parenterale,Olimel N9,1600,85,1500,,,,,,,,,
+Parenterale,Olimel N9,2140,113,2000,,,,,,,,,
+Parenterale,Olimel N12,620,49,650,,,,,,,,,
+Enterale,Nutrison Standard 500 mL,500,20,500,19.5,62,0,425,270,0,457198,6135853,Normoénergétique et normoprotidique sans fibres
+Enterale,Nutrison Multi Fibre 500 mL,515,20,500,20,62,7.5,420,270,0,457199,6135853,Normoénergétique et normoprotidique avec fibres
+Enterale,Nutrison Energy Multi Fibre 500 mL,765,30,500,29,92,7.5,380,480,0,013177,6135882,Hyperénergétique avec fibres
+Enterale,Nutrison Protein Plus Energy Multi Fibre 500 mL,765,37.5,500,29,85,7.5,380,390,4.5,556941,6135913,Hyperénergétique et hyperprotidique avec fibres
+Enterale,Fresubin 2 kcal HP 500 mL,1000,50,500,50,90,0,345,420,13,537608,1194578,Hyperénergétique et hyperprotidique sans fibres
+Enterale,Fresubin 2 kcal HP 1000 mL,2000,100,1000,100,180,0,690,420,26,589851,1193805,Hyperénergétique et hyperprotidique sans fibres
+Enterale,Fresubin 2 kcal HP Fibre 500 mL,1000,50,500,50,85,7.5,345,420,13,537607,1139770,Index glycémique bas; fibres solubles et insolubles
+Enterale,Fresubin 2 kcal HP Fibre 1000 mL,2000,100,1000,100,170,15,690,420,26,589850,1151333,Index glycémique bas; fibres solubles et insolubles
+Enterale,Fresubin Megareal 500 mL,700,34.5,500,26.5,75,0,395,270,6,594952,6135327,Sans fibres; enrichi en EPA et DHA; teneur élevée en oméga-3

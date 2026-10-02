@@ -1,8 +1,13 @@
-import type { NonNutritionalInputs, PatientDraft } from "@/types/nutrition";
+import type {
+  NonNutritionalInputs,
+  NutritionPhase,
+  PatientDraft,
+} from "@/types/nutrition";
 
 type PatientPanelProps = {
   patient: PatientDraft;
   enteralContraindicationsCatalog: string[];
+  phaseDefinitions: Record<NutritionPhase, string>;
   onPatientChange: <K extends keyof PatientDraft>(
     key: K,
     value: PatientDraft[K],
@@ -17,6 +22,7 @@ type PatientPanelProps = {
 export function PatientPanel({
   patient,
   enteralContraindicationsCatalog,
+  phaseDefinitions,
   onPatientChange,
   nonNutritionalInputs,
   onNonNutritionalChange,
@@ -102,7 +108,61 @@ export function PatientPanel({
           />
         </label>
         <label style={{ display: "grid", gap: "0.25rem" }}>
-          <span style={{ color: "#173a78", fontSize: "0.85rem" }}>Phase clinique</span>
+          <span
+            style={{
+              color: "#173a78",
+              fontSize: "0.85rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.45rem",
+            }}
+          >
+            Phase clinique
+            <details style={{ position: "relative" }}>
+              <summary
+                aria-label="Afficher la définition des phases cliniques"
+                title="Définition des phases cliniques"
+                style={{
+                  cursor: "pointer",
+                  listStyle: "none",
+                  width: 22,
+                  height: 22,
+                  borderRadius: 999,
+                  display: "grid",
+                  placeItems: "center",
+                  background: "#edf4ff",
+                  border: "1px solid rgba(13,71,161,0.18)",
+                  color: "#0d47a1",
+                  fontWeight: 800,
+                }}
+              >
+                ?
+              </summary>
+              <div
+                style={{
+                  position: "absolute",
+                  zIndex: 20,
+                  top: 28,
+                  left: 0,
+                  width: "min(520px, 78vw)",
+                  padding: "1rem",
+                  borderRadius: 16,
+                  background: "#fff",
+                  border: "1px solid rgba(13,71,161,0.14)",
+                  boxShadow: "0 18px 50px rgba(13,71,161,0.16)",
+                  color: "#405579",
+                  lineHeight: 1.55,
+                }}
+              >
+                <strong>État de choc / défaillance multiviscérale</strong>
+                <p>{phaseDefinitions.aigue_defaillance}</p>
+                <strong>Stabilisation</strong>
+                <p>{phaseDefinitions.stabilisation}</p>
+                <strong>Réhabilitation</strong>
+                <p style={{ marginBottom: 0 }}>{phaseDefinitions.rehabilitation}</p>
+              </div>
+            </details>
+          </span>
           <select
             value={patient.phase}
             onChange={(event) =>
@@ -279,10 +339,13 @@ export function PatientPanel({
           <select
             value={patient.routePreference}
             onChange={(event) =>
-              onPatientChange(
-                "routePreference",
-                event.target.value as PatientDraft["routePreference"],
-              )
+              (() => {
+                const route = event.target.value as PatientDraft["routePreference"];
+                onPatientChange("routePreference", route);
+                if (route === "Parenterale") {
+                  onPatientChange("alreadyReceivingEnteral", false);
+                }
+              })()
             }
           >
             <option value="Enterale">Entérale</option>
@@ -290,6 +353,78 @@ export function PatientPanel({
             <option value="Mixte">Mixte</option>
           </select>
         </label>
+
+        {(patient.routePreference === "Enterale" || patient.routePreference === "Mixte") && (
+          <fieldset
+            style={{
+              margin: 0,
+              padding: "0.85rem",
+              borderRadius: 16,
+              border: "1px solid rgba(13,71,161,0.1)",
+              background: "rgba(248,251,255,0.82)",
+            }}
+          >
+            <legend style={{ padding: "0 0.35rem", color: "#173a78", fontWeight: 700 }}>
+              Présentation de la prescription entérale
+            </legend>
+            <div style={{ display: "grid", gap: "0.6rem", marginTop: "0.35rem" }}>
+              {[
+                ["continuous_rate", "Débit continu en mL/h"],
+                ["period_volumes", "Volumes à administrer par périodes"],
+              ].map(([value, label]) => (
+                <label key={value} style={{ display: "flex", gap: "0.45rem" }}>
+                  <input
+                    type="radio"
+                    name="enteralAdministrationMode"
+                    checked={patient.enteralAdministrationMode === value}
+                    onChange={() =>
+                      onPatientChange(
+                        "enteralAdministrationMode",
+                        value as PatientDraft["enteralAdministrationMode"],
+                      )
+                    }
+                    style={{ width: "auto" }}
+                  />
+                  <span>{label}</span>
+                </label>
+              ))}
+              <div style={{ color: "#5b6f90", fontSize: "0.82rem", lineHeight: 1.5 }}>
+                En mode volumes, les poches sont réparties sur 12 h jusqu&apos;à deux
+                poches, puis régulièrement sur 24 h (trois poches : 8 h par poche).
+              </div>
+            </div>
+          </fieldset>
+        )}
+
+        {(patient.routePreference === "Enterale" || patient.routePreference === "Mixte") && (
+          <fieldset
+            style={{
+              margin: 0,
+              padding: "0.85rem",
+              borderRadius: 16,
+              border: "1px solid rgba(13,71,161,0.1)",
+              background: "rgba(248,251,255,0.82)",
+            }}
+          >
+            <legend style={{ padding: "0 0.35rem", color: "#173a78", fontWeight: 700 }}>
+              Le patient reçoit-il déjà une nutrition entérale ?
+            </legend>
+            <div style={{ display: "flex", gap: "1.2rem", marginTop: "0.35rem" }}>
+              {[false, true].map((value) => (
+                <label key={String(value)} style={{ display: "flex", gap: "0.45rem" }}>
+                  <input
+                    type="radio"
+                    name="alreadyReceivingEnteral"
+                    checked={patient.alreadyReceivingEnteral === value}
+                    onChange={() => onPatientChange("alreadyReceivingEnteral", value)}
+                    style={{ width: "auto" }}
+                  />
+                  <span>{value ? "Oui" : "Non"}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        )}
       </div>
 
       <div style={sectionStyle}>
@@ -355,20 +490,30 @@ export function PatientPanel({
             </label>
             <label style={{ display: "grid", gap: "0.25rem" }}>
               <span style={{ color: "#173a78", fontSize: "0.85rem" }}>
-                Concentration citrate (mmol/L)
+                Dose de citrate (mmol/L de sang traité)
               </span>
               <input
                 type="number"
                 step="0.1"
-                value={nonNutritionalInputs.citrateConcentrationMmolL}
+                value={nonNutritionalInputs.citrateDoseMmolLBlood}
                 onChange={(event) =>
                   onNonNutritionalChange(
-                    "citrateConcentrationMmolL",
+                    "citrateDoseMmolLBlood",
                     Number(event.target.value),
                   )
                 }
               />
             </label>
+            <div
+              style={{
+                gridColumn: "1 / -1",
+                color: "#5b6f90",
+                fontSize: "0.83rem",
+                lineHeight: 1.5,
+              }}
+            >
+              Calcul RFE avec une fraction d&apos;élimination du citrate fixée à 50 %.
+            </div>
           </div>
         )}
       </div>

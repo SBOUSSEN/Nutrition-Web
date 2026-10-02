@@ -7,7 +7,7 @@ export function Hero() {
       style={{
         position: "relative",
         display: "grid",
-        gridTemplateColumns: "220px minmax(0, 1fr) 136px",
+        gridTemplateColumns: "minmax(340px, 420px) minmax(0, 1fr)",
         gap: "1rem",
         padding: "1.1rem",
         borderRadius: "28px",
@@ -29,29 +29,47 @@ export function Hero() {
       />
 
       <div
+        className="hero-logo-panel"
         style={{
           position: "relative",
           borderRadius: 22,
-          padding: "0.55rem",
-          background: "rgba(255,255,255,0.72)",
-          border: "1px solid rgba(13, 71, 161, 0.1)",
+          padding: "0.75rem 0.85rem 0.9rem",
+          background:
+            "linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(239,246,255,0.88) 58%, rgba(255,246,236,0.9) 100%)",
+          border: "1px solid rgba(13, 71, 161, 0.12)",
+          boxShadow: "0 14px 34px rgba(13, 71, 161, 0.09)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          alignSelf: "center",
+          overflow: "hidden",
         }}
       >
         <Image
-          src="/branding/logo-reanimations.png"
-          alt="Logo des réanimations"
-          width={360}
-          height={216}
+          src="/branding/logo-reanimations-aphm-v2.png"
+          alt="Logo Réanimations AP-HM"
+          width={2172}
+          height={724}
           style={{
             width: "100%",
             height: "auto",
-            maxHeight: 138,
+            maxHeight: 176,
             objectFit: "contain",
+            filter: "drop-shadow(0 6px 10px rgba(13, 71, 161, 0.08))",
           }}
           priority
+        />
+        <div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            left: "12%",
+            right: "12%",
+            bottom: 0,
+            height: 4,
+            borderRadius: "999px 999px 0 0",
+            background: "linear-gradient(90deg, #0d47a1 0%, #0d47a1 48%, #ff7a00 52%, #ff7a00 100%)",
+          }}
         />
       </div>
 
@@ -135,33 +153,64 @@ export function Hero() {
         >
           Outil d&apos;aide à la décision. Validation médicale obligatoire.
         </p>
+
+        <div
+          style={{
+            marginTop: "0.7rem",
+            display: "inline-flex",
+            alignItems: "center",
+            padding: "0.45rem 0.75rem",
+            borderRadius: 12,
+            background: "rgba(255,255,255,0.72)",
+            borderLeft: "3px solid #ff7a00",
+            color: "#173a78",
+            fontSize: "0.84rem",
+            fontWeight: 700,
+          }}
+        >
+          Concepteurs : Bénédicte Grigoresco - Salah Boussen
+        </div>
+
+        <div
+          style={{
+            marginTop: "0.75rem",
+            display: "flex",
+            gap: "0.55rem",
+            flexWrap: "wrap",
+          }}
+        >
+          <a
+            href="/rfe/Version-longue.pdf"
+            download
+            style={{
+              padding: "0.52rem 0.75rem",
+              borderRadius: 12,
+              background: "#0d47a1",
+              color: "#fff",
+              fontSize: "0.82rem",
+              fontWeight: 700,
+            }}
+          >
+            Télécharger les RFE - version longue
+          </a>
+          <a
+            href="/rfe/Figures-RFE-Nutrition.pdf"
+            download
+            style={{
+              padding: "0.52rem 0.75rem",
+              borderRadius: 12,
+              background: "#fff",
+              border: "1px solid rgba(13,71,161,0.18)",
+              color: "#0d47a1",
+              fontSize: "0.82rem",
+              fontWeight: 700,
+            }}
+          >
+            Télécharger les RFE - version courte
+          </a>
+        </div>
       </div>
 
-      <div
-        style={{
-          position: "relative",
-          zIndex: 1,
-          borderRadius: 24,
-          overflow: "hidden",
-          border: "1px solid rgba(255, 122, 0, 0.16)",
-          background: "rgba(255,255,255,0.78)",
-          alignSelf: "stretch",
-          minHeight: 136,
-        }}
-      >
-        <Image
-          src="/branding/conseils-benedicte.png"
-          alt="Vignette conseils diététiques"
-          width={512}
-          height={512}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            objectPosition: "center top",
-          }}
-        />
-      </div>
     </section>
   );
 }

@@ -4,6 +4,7 @@ export type NutritionPhase =
   | "rehabilitation";
 
 export type RouteOption = "Enterale" | "Parenterale" | "Mixte";
+export type EnteralAdministrationMode = "continuous_rate" | "period_volumes";
 
 export type PatientDraft = {
   heightM: number;
@@ -20,6 +21,8 @@ export type PatientDraft = {
   renalFailureNoRrt: boolean;
   enteralContraindications: string[];
   routePreference: RouteOption;
+  alreadyReceivingEnteral: boolean;
+  enteralAdministrationMode: EnteralAdministrationMode;
 };
 
 export type NonNutritionalInputs = {
@@ -29,7 +32,7 @@ export type NonNutritionalInputs = {
   glucoseSolution: string | null;
   glucoseVolumeMlDay: number;
   bloodFlowMlMin: number;
-  citrateConcentrationMmolL: number;
+  citrateDoseMmolLBlood: number;
 };
 
 export type PhaseTargets = {
@@ -49,8 +52,8 @@ export type NutritionRules = {
   nonNutritionalConstants: {
     propofolKcalPerMl: number;
     glucoseKcalPerG: number;
-    citrateKcalPerG: number;
-    citrateKcalPerMmol?: number;
+    citrateKcalPerMmol: number;
+    citrateBloodFlowConversionLDay: number;
   };
   glucoseSolutionsGPer100Ml: Record<string, number>;
   enteralContraindications: string[];
@@ -64,7 +67,23 @@ export type NutritionRules = {
   };
   defaults: {
     citrateSolutionName: string;
-    citrateConcentrationGMl: number;
+    citrateDoseMmolLBlood: number;
+    citrateEliminationFraction: number;
+  };
+  clinicalPhaseDefinitions: Record<NutritionPhase, string>;
+  nutritionProgression: {
+    notAlreadyReceivingEnteral: NutritionProgressionRule;
+    alreadyReceivingEnteral: NutritionProgressionRule;
+  };
+  enteralAdministration: {
+    defaultMode: EnteralAdministrationMode;
+    modes: EnteralAdministrationMode[];
+    periodVolumes: {
+      standardPeriodHours: number;
+      dailyHours: number;
+      maxBagsWithStandardPeriod: number;
+      note: string;
+    };
   };
   validationNeeded?: string[];
 };
@@ -78,10 +97,10 @@ export type PatientComputed = {
 
 export type EerComputed = {
   bloodFlowMlMin: number;
-  citrateConcentrationMmolL: number;
-  regiocitFlowMlH: number;
-  citrateMmolH: number;
-  citrateMmolDay: number;
+  citrateDoseMmolLBlood: number;
+  citrateEliminationFraction: number;
+  citrateAdministeredMmolDay: number;
+  citrateMetabolizedMmolDay: number;
   citrateKcal: number;
 };
 
@@ -101,14 +120,24 @@ export type NutritionSummary = {
   glucoseKcal: number;
   citrateKcal: number;
   bloodFlowMlMin: number;
-  citrateConcentrationMmolL: number;
-  regiocitFlowMlH: number;
-  citrateMmolH: number;
-  citrateMmolDay: number;
+  citrateDoseMmolLBlood: number;
+  citrateEliminationFraction: number;
+  citrateAdministeredMmolDay: number;
+  citrateMetabolizedMmolDay: number;
   nonNutritionalKcal: number;
   kcalNutritionMin: number;
   kcalNutritionMax: number;
   shouldBlockPrescription: boolean;
+};
+
+export type NutritionProgressionStep = {
+  day: "Jour 1" | "Jour 2" | "Jour 3";
+  rangePosition: number;
+};
+
+export type NutritionProgressionRule = {
+  source: string;
+  steps: NutritionProgressionStep[];
 };
 
 export type ThreeDayPlanStep = {
@@ -122,6 +151,15 @@ export type SoluteRecord = {
   kcal: number;
   proteines_g: number;
   volume_ml: number;
+  lipides_g?: number | null;
+  glucides_g?: number | null;
+  fibres_g?: number | null;
+  eau_ml?: number | null;
+  osmolarite_mosm_l?: number | null;
+  tcm_g?: number | null;
+  reference?: string | null;
+  code_lppr?: string | null;
+  specificites?: string | null;
 };
 
 export type CandidateComponent = {

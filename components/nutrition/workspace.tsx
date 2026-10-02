@@ -19,7 +19,7 @@ import type {
   ThreeDayPlanStep,
 } from "@/types/nutrition";
 
-const defaultPatient: PatientDraft = {
+const defaultPatientBase: Omit<PatientDraft, "enteralAdministrationMode"> = {
   heightM: 1.75,
   actualWeightKg: 70,
   phosphoremiaMmolL: 1,
@@ -34,34 +34,45 @@ const defaultPatient: PatientDraft = {
   renalFailureNoRrt: false,
   enteralContraindications: [],
   routePreference: "Enterale",
+  alreadyReceivingEnteral: false,
 };
 
-type NutritionWorkspaceProps = {
-  initialRules: NutritionRules;
-  initialSolutes: SoluteRecord[];
-  sourcePaths: {
-    rulesPath: string;
-    solutesPath: string;
-    mode: "bundled" | "external";
+function createDefaultPatient(rules: NutritionRules): PatientDraft {
+  return {
+    ...defaultPatientBase,
+    enteralContraindications: [],
+    enteralAdministrationMode: rules.enteralAdministration.defaultMode,
   };
-};
+}
 
-export function NutritionWorkspace({
-  initialRules,
-  initialSolutes,
-  sourcePaths,
-}: NutritionWorkspaceProps) {
-  const [patient, setPatient] = useState<PatientDraft>(defaultPatient);
-  const [setupCompleted, setSetupCompleted] = useState(false);
-  const [inputs, setInputs] = useState<NonNutritionalInputs>({
+function createDefaultInputs(rules: NutritionRules): NonNutritionalInputs {
+  return {
     propofolRateMlH: 0,
     propofolDoseMgH: 0,
     propofolConcentrationMgMl: 10,
     glucoseSolution: null,
     glucoseVolumeMlDay: 0,
-    bloodFlowMlMin: getDefaultBloodFlowMlMin(defaultPatient.actualWeightKg),
-    citrateConcentrationMmolL: 3.3,
-  });
+    bloodFlowMlMin: getDefaultBloodFlowMlMin(defaultPatientBase.actualWeightKg),
+    citrateDoseMmolLBlood: rules.defaults.citrateDoseMmolLBlood,
+  };
+}
+
+type NutritionWorkspaceProps = {
+  initialRules: NutritionRules;
+  initialSolutes: SoluteRecord[];
+};
+
+export function NutritionWorkspace({
+  initialRules,
+  initialSolutes,
+}: NutritionWorkspaceProps) {
+  const [patient, setPatient] = useState<PatientDraft>(() =>
+    createDefaultPatient(initialRules),
+  );
+  const [setupCompleted, setSetupCompleted] = useState(false);
+  const [inputs, setInputs] = useState<NonNutritionalInputs>(() =>
+    createDefaultInputs(initialRules),
+  );
 
   const summary = useMemo(
     () => buildSummary(patient, inputs, initialRules),
@@ -79,8 +90,16 @@ export function NutritionWorkspace({
         patient.phase,
         summary.kcalTargetMin,
         summary.kcalTargetMax,
+        patient.alreadyReceivingEnteral &&
+          (patient.routePreference === "Enterale" || patient.routePreference === "Mixte"),
       ),
-    [patient.phase, summary.kcalTargetMin, summary.kcalTargetMax],
+    [
+      patient.alreadyReceivingEnteral,
+      patient.phase,
+      patient.routePreference,
+      summary.kcalTargetMin,
+      summary.kcalTargetMax,
+    ],
   );
 
   const bestProposal = proposals[0] ?? null;
@@ -108,6 +127,12 @@ export function NutritionWorkspace({
     value: NonNutritionalInputs[K],
   ) {
     setInputs((current) => ({ ...current, [key]: value }));
+  }
+
+  function resetPatient() {
+    setPatient(createDefaultPatient(initialRules));
+    setInputs(createDefaultInputs(initialRules));
+    setSetupCompleted(false);
   }
 
   const setupContent = (
@@ -158,6 +183,7 @@ export function NutritionWorkspace({
         <PatientPanel
           patient={patient}
           enteralContraindicationsCatalog={initialRules.enteralContraindications}
+          phaseDefinitions={initialRules.clinicalPhaseDefinitions}
           onPatientChange={updatePatient}
           nonNutritionalInputs={inputs}
           onNonNutritionalChange={updateInputs}
@@ -285,22 +311,40 @@ export function NutritionWorkspace({
           summary={summary}
           phaseLabel={initialRules.phaseTargets[patient.phase].label}
         />
-        <button
-          type="button"
-          onClick={() => setSetupCompleted(false)}
-          style={{
-            padding: "0.85rem 1rem",
-            borderRadius: 16,
-            border: "1px solid rgba(13,71,161,0.12)",
-            background: "rgba(255,255,255,0.92)",
-            color: "#173a78",
-            fontWeight: 700,
-            cursor: "pointer",
-            minWidth: 220,
-          }}
-        >
-          Retour à la saisie patient
-        </button>
+        <div style={{ display: "grid", gap: "0.65rem" }}>
+          <button
+            type="button"
+            onClick={() => setSetupCompleted(false)}
+            style={{
+              padding: "0.85rem 1rem",
+              borderRadius: 16,
+              border: "1px solid rgba(13,71,161,0.12)",
+              background: "rgba(255,255,255,0.92)",
+              color: "#173a78",
+              fontWeight: 700,
+              cursor: "pointer",
+              minWidth: 220,
+            }}
+          >
+            Retour à la prescription
+          </button>
+          <button
+            type="button"
+            onClick={resetPatient}
+            style={{
+              padding: "0.85rem 1rem",
+              borderRadius: 16,
+              border: "1px solid rgba(255,122,0,0.2)",
+              background: "linear-gradient(180deg, #fff8f1 0%, #fff0e2 100%)",
+              color: "#b45309",
+              fontWeight: 700,
+              cursor: "pointer",
+              minWidth: 220,
+            }}
+          >
+            Nouveau patient
+          </button>
+        </div>
       </div>
 
       <TabsShell
@@ -309,8 +353,8 @@ export function NutritionWorkspace({
         proposals={proposals}
         bestProposal={bestProposal}
         threeDayPlan={threeDayPlan}
-        sourcePaths={sourcePaths}
-        validationNeeded={initialRules.validationNeeded ?? []}
+        enteralAdministration={initialRules.enteralAdministration}
+        solutes={initialSolutes}
       />
     </div>
   );

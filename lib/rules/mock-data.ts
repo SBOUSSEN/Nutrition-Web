@@ -32,8 +32,8 @@ export const demoRules: NutritionRules = {
   nonNutritionalConstants: {
     propofolKcalPerMl: 1.1,
     glucoseKcalPerG: 4,
-    citrateKcalPerG: 3,
     citrateKcalPerMmol: 0.59,
+    citrateBloodFlowConversionLDay: 1.44,
   },
   glucoseSolutionsGPer100Ml: {
     "G2.5": 2.5,
@@ -86,7 +86,40 @@ export const demoRules: NutritionRules = {
   },
   defaults: {
     citrateSolutionName: "Regiocit",
-    citrateConcentrationGMl: 0,
+    citrateDoseMmolLBlood: 3.3,
+    citrateEliminationFraction: 0.5,
+  },
+  clinicalPhaseDefinitions: {
+    aigue_defaillance: "État de choc ou de défaillance multiviscérale.",
+    stabilisation: "Amélioration clinique avec résolution progressive des défaillances.",
+    rehabilitation: "Patient stabilisé pouvant bénéficier d’une réhabilitation active.",
+  },
+  nutritionProgression: {
+    notAlreadyReceivingEnteral: {
+      source: "RFE 2026 et règle opérationnelle locale.",
+      steps: [
+        { day: "Jour 1", rangePosition: 0 },
+        { day: "Jour 2", rangePosition: 0.5 },
+        { day: "Jour 3", rangePosition: 1 },
+      ],
+    },
+    alreadyReceivingEnteral: {
+      source: "Règle clinique locale.",
+      steps: [
+        { day: "Jour 1", rangePosition: 0.5 },
+        { day: "Jour 2", rangePosition: 1 },
+      ],
+    },
+  },
+  enteralAdministration: {
+    defaultMode: "continuous_rate",
+    modes: ["continuous_rate", "period_volumes"],
+    periodVolumes: {
+      standardPeriodHours: 12,
+      dailyHours: 24,
+      maxBagsWithStandardPeriod: 2,
+      note: "Répartition par périodes selon le nombre de poches.",
+    },
   },
   validationNeeded: [],
 };

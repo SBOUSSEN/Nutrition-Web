@@ -3,9 +3,12 @@
 import { useMemo, useState } from "react";
 
 import type {
+  NutritionRules,
   NutritionSummary,
   PatientDraft,
+  PrescriptionComponentBreakdown,
   PrescriptionOption,
+  SoluteRecord,
   ThreeDayPlanStep,
 } from "@/types/nutrition";
 
@@ -17,6 +20,7 @@ const tabs = [
   "Synthèse",
   "Proposition",
   "Surveillance",
+  "Produits disponibles",
 ] as const;
 
 type TabsShellProps = {
@@ -25,12 +29,8 @@ type TabsShellProps = {
   proposals: PrescriptionOption[];
   bestProposal: PrescriptionOption | null;
   threeDayPlan: ThreeDayPlanStep[];
-  sourcePaths: {
-    rulesPath: string;
-    solutesPath: string;
-    mode: "bundled" | "external";
-  };
-  validationNeeded: string[];
+  enteralAdministration: NutritionRules["enteralAdministration"];
+  solutes: SoluteRecord[];
 };
 
 function MetricCard({ label, value }: { label: string; value: string }) {
@@ -56,10 +56,113 @@ export function TabsShell({
   proposals,
   bestProposal,
   threeDayPlan,
-  sourcePaths,
-  validationNeeded,
+  enteralAdministration,
+  solutes,
 }: TabsShellProps) {
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>("Proposition");
+  const [monitoringChecks, setMonitoringChecks] = useState<Set<string>>(new Set());
+  const enteralProducts = solutes.filter((solute) => solute.voie === "Enterale");
+  const [selectedProductKey, setSelectedProductKey] = useState(
+    enteralProducts[0]?.solute ?? "",
+  );
+  const selectedProduct =
+    enteralProducts.find((product) => product.solute === selectedProductKey) ??
+    enteralProducts[0];
+  const kcalPerKgMin = summary.kcalTargetMin / summary.referenceWeightKg;
+  const kcalPerKgMax = summary.kcalTargetMax / summary.referenceWeightKg;
+  const kcalPerKgMidpoint = (kcalPerKgMin + kcalPerKgMax) / 2;
+  const formatKcalPerKg = (value: number) =>
+    Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1).replace(".", ",");
+
+  function formatHours(value: number) {
+    return Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1).replace(".", ",");
+  }
+
+  function formatAdministration(
+    component: PrescriptionComponentBreakdown,
+    ratio = 1,
+  ): string {
+    const volume = component.volumeMlDay * ratio;
+    const roundedVolume = Math.round(volume);
+
+    if (
+      component.voie !== "Enterale" ||
+      patient.enteralAdministrationMode === "continuous_rate"
+    ) {
+      const continuousLabel = component.voie === "Enterale" ? " en continu" : "";
+      return `${roundedVolume} mL/24 h de ${component.solute} en ${component.voie.toLowerCase()} (${(volume / 24).toFixed(1).replace(".", ",")} mL/h${continuousLabel})`;
+    }
+
+    const bagVolume =
+      component.qty > 0 ? component.volumeMlDay / component.qty : component.volumeMlDay;
+    const bagCount = Math.max(1, Math.ceil((volume - 1e-9) / bagVolume));
+    const periodRules = enteralAdministration.periodVolumes;
+    const periodHours =
+      bagCount <= periodRules.maxBagsWithStandardPeriod
+        ? periodRules.standardPeriodHours
+        : periodRules.dailyHours / bagCount;
+    const portions: number[] = [];
+    let remainingVolume = volume;
+
+    for (let index = 0; index < bagCount; index += 1) {
+      const portion = Math.min(bagVolume, remainingVolume);
+      if (portion > 0) {
+        portions.push(portion);
+        remainingVolume -= portion;
+      }
+    }
+
+    const schedule = portions
+      .map(
+        (portion) =>
+          `${Math.round(portion)} mL sur ${formatHours(periodHours)} h`,
+      )
+      .join(" puis ");
+    return `${schedule} de ${component.solute} par voie entérale`;
+  }
+
+  function toggleMonitoringItem(item: string) {
+    setMonitoringChecks((current) => {
+      const next = new Set(current);
+      if (next.has(item)) {
+        next.delete(item);
+      } else {
+        next.add(item);
+      }
+      return next;
+    });
+  }
+
+  function monitoringItem(id: string, label: string) {
+    return (
+      <label
+        key={id}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "20px minmax(0, 1fr)",
+          gap: "0.65rem",
+          alignItems: "start",
+          padding: "0.7rem 0.75rem",
+          borderRadius: 14,
+          background: monitoringChecks.has(id) ? "rgba(20, 134, 137, 0.1)" : "#fff",
+          border: monitoringChecks.has(id)
+            ? "1px solid rgba(20, 134, 137, 0.25)"
+            : "1px solid rgba(13,71,161,0.08)",
+          color: "#29466f",
+          lineHeight: 1.45,
+          cursor: "pointer",
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={monitoringChecks.has(id)}
+          onChange={() => toggleMonitoringItem(id)}
+          style={{ width: 18, height: 18, marginTop: 2 }}
+        />
+        <span>{label}</span>
+      </label>
+    );
+  }
 
   const progressivePlan = useMemo(() => {
     if (!bestProposal || threeDayPlan.length === 0 || bestProposal.nutritionalKcal <= 0) {
@@ -67,14 +170,23 @@ export function TabsShell({
     }
 
     return threeDayPlan.map((step) => {
-      const ratio = Math.min(1, Math.max(0, step.kcal / bestProposal.nutritionalKcal));
-      const details = bestProposal.componentBreakdown.map((component) => {
-        const volume = component.volumeMlDay * ratio;
-        return `${Math.round(volume)} mL/24 h de ${component.solute} en ${component.voie.toLowerCase()}`;
-      });
+      const nutritionalTarget = Math.max(0, step.kcal - summary.nonNutritionalKcal);
+      const ratio = Math.min(
+        1,
+        Math.max(0, nutritionalTarget / bestProposal.nutritionalKcal),
+      );
+      const details = bestProposal.componentBreakdown.map((component) =>
+        formatAdministration(component, ratio),
+      );
       return { ...step, details };
     });
-  }, [bestProposal, threeDayPlan]);
+  }, [
+    bestProposal,
+    enteralAdministration,
+    patient.enteralAdministrationMode,
+    summary.nonNutritionalKcal,
+    threeDayPlan,
+  ]);
 
   const activeContent = (() => {
     if (summary.shouldBlockPrescription && activeTab !== "Sécurité clinique") {
@@ -117,6 +229,18 @@ export function TabsShell({
               Voie preferee actuelle : {patient.routePreference}. La voie enterale reste a
               privilegier au maximum.
             </p>
+            {(patient.routePreference === "Enterale" ||
+              patient.routePreference === "Mixte") && (
+              <p style={{ lineHeight: 1.6 }}>
+                Présentation retenue pour la nutrition entérale : {" "}
+                <strong>
+                  {patient.enteralAdministrationMode === "continuous_rate"
+                    ? "débit continu en mL/h"
+                    : "volumes à administrer par périodes"}
+                </strong>
+                .
+              </p>
+            )}
           </div>
         );
       case "EER":
@@ -125,14 +249,20 @@ export function TabsShell({
             <h3>EER</h3>
             <p style={{ margin: 0, lineHeight: 1.6 }}>
               {patient.eer && patient.citrateAnticoagulation
-                ? `Debit sang ${summary.bloodFlowMlMin.toFixed(0)} mL/min, Regiocit ${summary.regiocitFlowMlH.toFixed(0)} mL/h, citrate ${summary.citrateMmolH.toFixed(3)} mmol/h soit ${summary.citrateMmolDay.toFixed(3)} mmol/24 h.`
+                ? `Débit sanguin ${summary.bloodFlowMlMin.toFixed(0)} mL/min, dose de citrate ${summary.citrateDoseMmolLBlood.toFixed(1)} mmol/L de sang traité. ${summary.citrateAdministeredMmolDay.toFixed(1)} mmol/j administrés, dont ${summary.citrateMetabolizedMmolDay.toFixed(1)} mmol/j métabolisés après ${Math.round(summary.citrateEliminationFraction * 100)} % d'élimination.`
                 : "EER non activee."}
             </p>
             {patient.eer && patient.citrateAnticoagulation && (
-              <MetricCard
-                label="Apport energetique du citrate"
-                value={`${summary.citrateKcal.toFixed(1)} kcal/j`}
-              />
+              <>
+                <MetricCard
+                  label="Apport énergétique du citrate"
+                  value={`${summary.citrateKcal.toFixed(1)} kcal/j`}
+                />
+                <p style={{ margin: 0, fontSize: "0.84rem", lineHeight: 1.55 }}>
+                  Formule RFE : débit sanguin × dose de citrate × 1,44 ×
+                  (1 - fraction éliminée) × 0,59 kcal/mmol.
+                </p>
+              </>
             )}
           </div>
         );
@@ -197,6 +327,12 @@ export function TabsShell({
             {threeDayPlan.length > 0 && (
               <div>
                 <h3>Progression proposee</h3>
+                <p style={{ lineHeight: 1.55 }}>
+                  {patient.alreadyReceivingEnteral &&
+                  (patient.routePreference === "Enterale" || patient.routePreference === "Mixte")
+                    ? `Patient déjà alimenté par voie entérale : objectif de ${formatKcalPerKg(kcalPerKgMidpoint)} kcal/kg/j à J1, puis ${formatKcalPerKg(kcalPerKgMax)} kcal/kg/j à J2.`
+                    : "Montée progressive du bas vers le haut de la fourchette selon la tolérance et l'état clinique."}
+                </p>
                 <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
                   {threeDayPlan.map((step) => (
                     <div
@@ -235,7 +371,7 @@ export function TabsShell({
                   {bestProposal.pathway} | {bestProposal.description}
                 </div>
                 <div style={{ color: "#5d4d39", lineHeight: 1.5 }}>
-                  Objectif final J3 : {bestProposal.nutritionalKcal.toFixed(0)} kcal
+                  Objectif final {threeDayPlan.at(-1)?.day} : {bestProposal.nutritionalKcal.toFixed(0)} kcal
                   nutritionnelles | {bestProposal.proteinG.toFixed(1)} g proteines
                 </div>
                 <div style={{ marginTop: "0.85rem", display: "grid", gap: "0.65rem" }}>
@@ -298,7 +434,9 @@ export function TabsShell({
                       {proposal.proteinG.toFixed(1)} g proteines
                     </div>
                     <div style={{ color: "#5d4d39", marginTop: "0.35rem", lineHeight: 1.5 }}>
-                      {proposal.componentDetails.join(" ; ")}
+                      {proposal.componentBreakdown
+                        .map((component) => formatAdministration(component))
+                        .join(" ; ")}
                     </div>
                   </div>
                 ))}
@@ -308,42 +446,295 @@ export function TabsShell({
         );
       case "Surveillance":
         return (
-          <div style={{ display: "grid", gap: "0.9rem" }}>
-            <h3>Surveillance</h3>
-            <p>La checklist de surveillance sera branchee ici dans l&apos;etape UI suivante.</p>
+          <div style={{ display: "grid", gap: "1rem" }}>
+            <div>
+              <h3 style={{ marginBottom: "0.35rem", color: "#173a78" }}>
+                Surveillance de la tolérance et de l&apos;efficacité
+              </h3>
+              <p style={{ margin: 0, lineHeight: 1.6 }}>
+                Suivre régulièrement la tolérance et l&apos;efficacité du support
+                nutritionnel pour adapter la prise en charge et prévenir les complications.
+              </p>
+            </div>
+
             <div
               style={{
-                borderRadius: 16,
-                padding: "0.9rem",
-                background: "#f7faff",
-                border: "1px solid rgba(13,71,161,0.08)",
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+                gap: "0.85rem",
               }}
             >
-              <div style={{ color: "#173a78", fontWeight: 700 }}>Sources metier chargees</div>
-              <div style={{ color: "#5d4d39", marginTop: "0.35rem", lineHeight: 1.55 }}>
-                Mode : {sourcePaths.mode === "external" ? "source externe" : "source embarquee"}
-                <br />
-                {sourcePaths.solutesPath}
-                <br />
-                {sourcePaths.rulesPath}
-              </div>
-            </div>
-            {validationNeeded.length > 0 && (
-              <div
+              <section
                 style={{
-                  borderRadius: 16,
-                  padding: "0.9rem",
-                  background: "#fff9f3",
-                  border: "1px solid rgba(255,122,0,0.16)",
+                  padding: "1rem",
+                  borderRadius: 20,
+                  background: "linear-gradient(180deg, #f1fbfb 0%, #e7f5f6 100%)",
+                  border: "1px solid rgba(20,134,137,0.2)",
                 }}
               >
-                <div style={{ color: "#d66500", fontWeight: 700 }}>Points a valider du JSON</div>
-                <ul style={{ margin: "0.5rem 0 0", paddingLeft: "1.2rem", color: "#5d4d39" }}>
-                  {validationNeeded.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
+                <div style={{ color: "#0f777a", fontWeight: 800, marginBottom: "0.7rem" }}>
+                  Tolérance clinique
+                </div>
+                <div style={{ display: "grid", gap: "0.55rem" }}>
+                  {monitoringItem("gids", "Évaluation clinique par le score GIDS")}
+                  <div
+                    style={{
+                      padding: "0.7rem 0.75rem",
+                      borderRadius: 14,
+                      background: "rgba(255,255,255,0.72)",
+                      border: "1px dashed rgba(20,134,137,0.3)",
+                      color: "#0f686b",
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    Le recueil du volume résiduel gastrique n&apos;est pas recommandé.
+                  </div>
+                </div>
+              </section>
+
+              <section
+                style={{
+                  padding: "1rem",
+                  borderRadius: 20,
+                  background: "linear-gradient(180deg, #f1fbfb 0%, #e7f5f6 100%)",
+                  border: "1px solid rgba(20,134,137,0.2)",
+                }}
+              >
+                <div style={{ color: "#0f777a", fontWeight: 800, marginBottom: "0.7rem" }}>
+                  Tolérance métabolique
+                </div>
+                <div style={{ display: "grid", gap: "0.55rem" }}>
+                  {monitoringItem(
+                    "hepatic",
+                    "Si nutrition parentérale et/ou dose élevée de propofol : bilan hépatique 2 fois/semaine",
+                  )}
+                  {monitoringItem(
+                    "triglycerides",
+                    "Si nutrition parentérale et/ou dose élevée de propofol : triglycérides 1 fois/semaine",
+                  )}
+                  {monitoringItem(
+                    "refeeding",
+                    "Dépistage du syndrome de renutrition : kaliémie, phosphatémie et magnésémie 1 fois/jour jusqu’à J3-J5",
+                  )}
+                </div>
+              </section>
+            </div>
+
+            <div>
+              <div
+                style={{
+                  color: "#a94f58",
+                  fontWeight: 800,
+                  marginBottom: "0.7rem",
+                  fontSize: "1rem",
+                }}
+              >
+                Efficacité du support nutritionnel
               </div>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                  gap: "0.85rem",
+                }}
+              >
+                {[
+                  {
+                    title: "Court terme",
+                    items: [
+                      ["weight", "Pesée régulière"],
+                      ["prealbumin", "Préalbumine 1 fois/semaine"],
+                      ["calorimetry", "Discuter un monitorage par calorimétrie indirecte"],
+                    ],
+                  },
+                  {
+                    title: "Moyen terme",
+                    items: [
+                      [
+                        "muscle",
+                        "Évaluation de la masse musculaire : imagerie, impédancemétrie ou DEXA",
+                      ],
+                    ],
+                  },
+                  {
+                    title: "Long terme",
+                    items: [["functional", "Tests fonctionnels"]],
+                  },
+                ].map((group) => (
+                  <section
+                    key={group.title}
+                    style={{
+                      padding: "1rem",
+                      borderRadius: 20,
+                      background: "linear-gradient(180deg, #fff7f7 0%, #fbeeee 100%)",
+                      border: "1px solid rgba(169,79,88,0.18)",
+                    }}
+                  >
+                    <div
+                      style={{ color: "#a94f58", fontWeight: 800, marginBottom: "0.7rem" }}
+                    >
+                      {group.title}
+                    </div>
+                    <div style={{ display: "grid", gap: "0.55rem" }}>
+                      {group.items.map(([id, label]) => monitoringItem(id, label))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            </div>
+
+            <div
+              style={{
+                borderRadius: 18,
+                padding: "0.9rem 1rem",
+                background: "linear-gradient(90deg, #eef9f9 0%, #fff5f4 100%)",
+                border: "1px solid rgba(13,71,161,0.1)",
+                color: "#29466f",
+                lineHeight: 1.55,
+              }}
+            >
+              <strong>Objectif :</strong> prévenir la dénutrition, détecter précocement les
+              complications et optimiser les résultats cliniques.
+            </div>
+
+            <details style={{ color: "#5d6f8a", fontSize: "0.84rem" }}>
+              <summary style={{ cursor: "pointer", fontWeight: 700 }}>Abréviations</summary>
+              <p style={{ lineHeight: 1.6 }}>
+                BH : bilan hépatique ; DEXA : absorptiométrie biphotonique à rayons X ;
+                GIDS : Gastrointestinal Dysfunction Score ; NP : nutrition parentérale ;
+                SRI : syndrome de renutrition inappropriée.
+              </p>
+            </details>
+          </div>
+        );
+      case "Produits disponibles":
+        return (
+          <div style={{ display: "grid", gap: "1rem" }}>
+            <div>
+              <h3 style={{ marginBottom: "0.35rem", color: "#173a78" }}>
+                Produits de nutrition entérale disponibles
+              </h3>
+              <p style={{ margin: 0, color: "#5b6f90", lineHeight: 1.6 }}>
+                Sélectionnez une poche pour afficher ses caractéristiques issues du
+                livret de nutrition entérale AP-HM.
+              </p>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+                gap: "0.7rem",
+              }}
+            >
+              {enteralProducts.map((product) => {
+                const selected = product.solute === selectedProduct?.solute;
+                return (
+                  <button
+                    key={product.solute}
+                    type="button"
+                    onClick={() => setSelectedProductKey(product.solute)}
+                    style={{
+                      padding: "0.85rem",
+                      borderRadius: 16,
+                      border: selected
+                        ? "1px solid rgba(255,122,0,0.5)"
+                        : "1px solid rgba(13,71,161,0.1)",
+                      background: selected
+                        ? "linear-gradient(135deg, #fff8ef 0%, #ffecd8 100%)"
+                        : "#fff",
+                      color: selected ? "#a94f00" : "#173a78",
+                      textAlign: "left",
+                      fontWeight: 750,
+                      lineHeight: 1.35,
+                      cursor: "pointer",
+                      boxShadow: selected ? "0 10px 24px rgba(255,122,0,0.09)" : "none",
+                    }}
+                  >
+                    {product.solute}
+                  </button>
+                );
+              })}
+            </div>
+
+            {selectedProduct && (
+              <section
+                style={{
+                  padding: "1.1rem",
+                  borderRadius: 22,
+                  background: "linear-gradient(145deg, #f8fbff 0%, #edf5ff 100%)",
+                  border: "1px solid rgba(13,71,161,0.12)",
+                  boxShadow: "0 14px 34px rgba(13,71,161,0.08)",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    gap: "1rem",
+                    flexWrap: "wrap",
+                    marginBottom: "0.9rem",
+                  }}
+                >
+                  <div>
+                    <div style={{ color: "#173a78", fontSize: "1.08rem", fontWeight: 850 }}>
+                      {selectedProduct.solute}
+                    </div>
+                    {selectedProduct.specificites && (
+                      <div style={{ color: "#5b6f90", marginTop: "0.25rem" }}>
+                        {selectedProduct.specificites}
+                      </div>
+                    )}
+                  </div>
+                  <div
+                    style={{
+                      padding: "0.45rem 0.7rem",
+                      borderRadius: 999,
+                      background: "#fff",
+                      color: "#0d47a1",
+                      border: "1px solid rgba(13,71,161,0.12)",
+                      fontWeight: 750,
+                    }}
+                  >
+                    {selectedProduct.volume_ml} mL
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(145px, 1fr))",
+                    gap: "0.7rem",
+                  }}
+                >
+                  <MetricCard label="Énergie" value={`${selectedProduct.kcal} kcal`} />
+                  <MetricCard label="Protéines" value={`${selectedProduct.proteines_g} g`} />
+                  <MetricCard label="Lipides" value={`${selectedProduct.lipides_g ?? "N/D"} g`} />
+                  <MetricCard label="Glucides" value={`${selectedProduct.glucides_g ?? "N/D"} g`} />
+                  <MetricCard label="Fibres" value={`${selectedProduct.fibres_g ?? "N/D"} g`} />
+                  <MetricCard label="TCM" value={`${selectedProduct.tcm_g ?? "N/D"} g`} />
+                  <MetricCard label="Eau" value={`${selectedProduct.eau_ml ?? "N/D"} mL`} />
+                  <MetricCard
+                    label="Osmolarité"
+                    value={`${selectedProduct.osmolarite_mosm_l ?? "N/D"} mOsm/L`}
+                  />
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "0.7rem 1.4rem",
+                    flexWrap: "wrap",
+                    marginTop: "0.9rem",
+                    color: "#405579",
+                    fontSize: "0.86rem",
+                  }}
+                >
+                  <span>Référence : {selectedProduct.reference ?? "N/D"}</span>
+                  <span>Code LPPR : {selectedProduct.code_lppr ?? "N/D"}</span>
+                </div>
+              </section>
             )}
           </div>
         );

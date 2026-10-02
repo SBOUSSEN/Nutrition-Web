@@ -65,7 +65,7 @@ export function SummaryPanel({ summary, phaseLabel }: SummaryPanelProps) {
           ],
           ["Cible proteines", summary.proteinTargetDisplay],
           ["Non nutritionnel", `${summary.nonNutritionalKcal.toFixed(0)} kcal/j`],
-          ["Regiocit", `${summary.regiocitFlowMlH.toFixed(0)} mL/h`],
+          ["Citrate", `${summary.citrateKcal.toFixed(0)} kcal/j`],
           ["Fenetre nutrition", `${summary.kcalNutritionMax.toFixed(0)} kcal/j max`],
         ].map(([label, value]) => (
           <div

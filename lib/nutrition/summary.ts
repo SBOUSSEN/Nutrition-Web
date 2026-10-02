@@ -1,7 +1,4 @@
-import {
-  calculateCitrateDeliveryMmol,
-  calculateCitrateKcalFromMmol,
-} from "@/lib/nutrition/eer";
+import { calculateCitrateFromRfe } from "@/lib/nutrition/eer";
 import {
   calculateGlucoseKcal,
   calculatePropofolFromDose,
@@ -59,23 +56,24 @@ export function buildSummary(
   );
 
   let bloodFlowMlMin = 0;
-  let citrateConcentrationMmolL = 0;
-  let regiocitFlowMlH = 0;
-  let citrateMmolH = 0;
-  let citrateMmolDay = 0;
+  let citrateDoseMmolLBlood = 0;
+  let citrateEliminationFraction = rules.defaults.citrateEliminationFraction;
+  let citrateAdministeredMmolDay = 0;
+  let citrateMetabolizedMmolDay = 0;
   let citrateKcal = 0;
 
   if (patient.eer && patient.citrateAnticoagulation) {
     bloodFlowMlMin = inputs.bloodFlowMlMin;
-    citrateConcentrationMmolL = inputs.citrateConcentrationMmolL;
-    const eer = calculateCitrateDeliveryMmol(
+    citrateDoseMmolLBlood = inputs.citrateDoseMmolLBlood;
+    const eer = calculateCitrateFromRfe(
       bloodFlowMlMin,
-      citrateConcentrationMmolL,
+      citrateDoseMmolLBlood,
+      rules,
     );
-    regiocitFlowMlH = eer.regiocitFlowMlH;
-    citrateMmolH = eer.citrateMmolH;
-    citrateMmolDay = eer.citrateMmolDay;
-    citrateKcal = calculateCitrateKcalFromMmol(citrateMmolDay);
+    citrateEliminationFraction = eer.citrateEliminationFraction;
+    citrateAdministeredMmolDay = eer.citrateAdministeredMmolDay;
+    citrateMetabolizedMmolDay = eer.citrateMetabolizedMmolDay;
+    citrateKcal = eer.citrateKcal;
   }
 
   const nonNutritionalKcal = propofolKcal + glucoseKcal + citrateKcal;
@@ -105,10 +103,10 @@ export function buildSummary(
     glucoseKcal,
     citrateKcal,
     bloodFlowMlMin,
-    citrateConcentrationMmolL,
-    regiocitFlowMlH,
-    citrateMmolH,
-    citrateMmolDay,
+    citrateDoseMmolLBlood,
+    citrateEliminationFraction,
+    citrateAdministeredMmolDay,
+    citrateMetabolizedMmolDay,
     nonNutritionalKcal,
     kcalNutritionMin: Math.max(0, kcalTargetMin - nonNutritionalKcal),
     kcalNutritionMax: Math.max(0, kcalTargetMax - nonNutritionalKcal),
