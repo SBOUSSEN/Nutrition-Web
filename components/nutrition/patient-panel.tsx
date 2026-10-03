@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+
 import type {
   NonNutritionalInputs,
   NutritionPhase,
@@ -27,6 +31,17 @@ export function PatientPanel({
   nonNutritionalInputs,
   onNonNutritionalChange,
 }: PatientPanelProps) {
+  const phosphoremiaHasFocus = useRef(false);
+  const [phosphoremiaInput, setPhosphoremiaInput] = useState(() =>
+    String(patient.phosphoremiaMmolL).replace(".", ","),
+  );
+
+  useEffect(() => {
+    if (!phosphoremiaHasFocus.current) {
+      setPhosphoremiaInput(String(patient.phosphoremiaMmolL).replace(".", ","));
+    }
+  }, [patient.phosphoremiaMmolL]);
+
   const hasLowPhosphorus =
     Number.isFinite(patient.phosphoremiaMmolL) && patient.phosphoremiaMmolL < 0.8;
   const hasSafetyAlert =
@@ -179,13 +194,40 @@ export function PatientPanel({
             Phosphorémie (mmol/L)
           </span>
           <input
-            type="number"
-            step="0.1"
-            value={patient.phosphoremiaMmolL}
-            onChange={(event) =>
-              onPatientChange("phosphoremiaMmolL", Number(event.target.value))
-            }
+            type="text"
+            inputMode="decimal"
+            autoComplete="off"
+            value={phosphoremiaInput}
+            onFocus={() => {
+              phosphoremiaHasFocus.current = true;
+            }}
+            onChange={(event) => {
+              const rawValue = event.target.value;
+              if (!/^\d*(?:[.,]\d*)?$/.test(rawValue)) {
+                return;
+              }
+
+              setPhosphoremiaInput(rawValue);
+              const normalizedValue = rawValue.replace(",", ".");
+              if (normalizedValue === "" || normalizedValue === ".") {
+                return;
+              }
+
+              const parsedValue = Number(normalizedValue);
+              if (Number.isFinite(parsedValue)) {
+                onPatientChange("phosphoremiaMmolL", parsedValue);
+              }
+            }}
+            onBlur={() => {
+              phosphoremiaHasFocus.current = false;
+              setPhosphoremiaInput(
+                String(patient.phosphoremiaMmolL).replace(".", ","),
+              );
+            }}
           />
+          <span style={{ color: "#7b8aa3", fontSize: "0.74rem" }}>
+            Virgule ou point acceptés.
+          </span>
         </label>
       </div>
 
